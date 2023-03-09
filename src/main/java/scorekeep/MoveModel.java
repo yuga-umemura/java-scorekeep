@@ -5,6 +5,8 @@ import com.amazonaws.services.dynamodbv2.AmazonDynamoDBClientBuilder;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBMapper;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBQueryExpression;
 import com.amazonaws.services.dynamodbv2.model.AttributeValue;
+import com.amazonaws.xray.AWSXRay;
+import com.amazonaws.xray.handlers.TracingHandler;
 
 import java.util.HashMap;
 import java.util.List;
@@ -12,7 +14,9 @@ import java.util.Map;
 
 public class MoveModel {
   /** AWS SDK credentials. */
+  /** DDBを計測するため、トレースハンドラーをAmazonDynamoDBClientBuilderに渡す */
   private AmazonDynamoDB client = AmazonDynamoDBClientBuilder.standard()
+        .withRequestHandlers(new TracingHandler(AWSXRay.getGlobalRecorder()))
         .build();
   private DynamoDBMapper mapper = new DynamoDBMapper(client);
   private final SessionModel sessionModel = new SessionModel();

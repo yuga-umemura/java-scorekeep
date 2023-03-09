@@ -1,0 +1,28 @@
+#!/bin/bash
+
+set -e 
+
+DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+MANIFEST_INPUT_FILE="scorekeep-manifest.template"
+MANIFEST_INPUT_PATH="${DIR}/template/${MANIFEST_INPUT_FILE}"
+
+MANIFEST_OUTPUT_FILE="scorekeep-manifest.yaml"
+MANIFEST_OUTPUT_PATH="${DIR}/${MANIFEST_OUTPUT_FILE}"
+
+PARAMETERS_FILE="../aws.env"
+PARAMETERS_PATH="${DIR}/${PARAMETERS_FILE}"
+
+echo "Sourcing paramters from ${PARAMETERS_PATH}"
+source ${PARAMETERS_PATH}
+
+if [[ -z "${ACCOUNT_ID}" || -z "${AWS_REGION}" ]]; then
+	echo "Must specify both ACCOUNT_ID and AWS_REGION in ${PARAMETERS_PATH}"
+	exit 1
+fi
+
+echo "Configuring region to: ${AWS_REGION}"
+echo "Configuring account id to: ${ACCOUNT_ID}"
+
+sed -e 's/\$\$REGION\$\$/'"${AWS_REGION}"'/g' -e 's/\$\$ACCOUNT_ID\$\$/'"${ACCOUNT_ID}"'/g' ${MANIFEST_INPUT_PATH} > ${MANIFEST_OUTPUT_PATH}
+
+echo "Manifest written to: ${MANIFEST_OUTPUT_PATH}"

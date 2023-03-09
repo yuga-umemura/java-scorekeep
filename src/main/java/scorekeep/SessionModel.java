@@ -4,13 +4,17 @@ import com.amazonaws.services.dynamodbv2.AmazonDynamoDB;
 import com.amazonaws.services.dynamodbv2.AmazonDynamoDBClientBuilder;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBMapper;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBScanExpression;
+import com.amazonaws.xray.AWSXRay;
+import com.amazonaws.xray.handlers.TracingHandler;
 
 import java.util.List;
 
 public class SessionModel {
 
   /** AWS SDK credentials. */
+  /** DDBを計測するため、トレースハンドラーをAmazonDynamoDBClientBuilderに渡す */
   private AmazonDynamoDB client = AmazonDynamoDBClientBuilder.standard()
+        .withRequestHandlers(new TracingHandler(AWSXRay.getGlobalRecorder()))
         .build();
   private DynamoDBMapper mapper = new DynamoDBMapper(client);
 

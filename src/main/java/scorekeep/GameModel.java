@@ -5,6 +5,8 @@ import com.amazonaws.services.dynamodbv2.AmazonDynamoDBClientBuilder;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBMapper;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBQueryExpression;
 import com.amazonaws.services.dynamodbv2.model.AttributeValue;
+import com.amazonaws.xray.AWSXRay;
+import com.amazonaws.xray.handlers.TracingHandler;
 
 import java.util.HashMap;
 import java.util.List;
@@ -13,18 +15,29 @@ import java.util.Set;
 
 public class GameModel {
   /** AWS SDK credentials. */
+  /** DDBを計測するため、トレースハンドラーをAmazonDynamoDBClientBuilderに渡す */
   private AmazonDynamoDB client = AmazonDynamoDBClientBuilder.standard()
+        // .withRequestHandlers(new TracingHandler(AWSXRay.getGlobalRecorder()))
         .build();
   private DynamoDBMapper mapper = new DynamoDBMapper(client);
   private final SessionModel sessionModel = new SessionModel();
 
   public void saveGame(Game game) throws SessionNotFoundException {
-    // check session
-    String sessionId = game.getSession();
-    if (sessionModel.loadSession(sessionId) == null ) {
-      throw new SessionNotFoundException(sessionId);
+    // subsegmentでラップ
+    Subsegment subsegment = AWSXRay.beginSubsegment("Save Game");
+    try {
+      // check session
+      String sessionId = game.getSession();
+      if (sessionModel.loadSession(sessionId) == null ) {
+        throw new SessionNotFoundException(sessionId);
+      }
+      mapper.save(game);
+    } catch (Exception e) {
+      subsegment.addException(e);
+      throw e;
+    } finally {
+      AWSXRay.endSubsegment();
     }
-    mapper.save(game);
   }
 
   public Game loadGame(String gameId) throws GameNotFoundException {

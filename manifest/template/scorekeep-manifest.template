@@ -1,0 +1,186 @@
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: sbr-poc-appmesh
+  labels:
+    mesh: sbr-poc-mesh
+    appmesh.k8s.aws/sidecarInjectorWebhook: enabled
+---
+apiVersion: appmesh.k8s.aws/v1beta2
+kind: Mesh
+metadata:
+  name: sbr-poc-mesh
+spec:
+  namespaceSelector:
+    matchLabels:
+      mesh: sbr-poc-mesh
+---
+apiVersion: appmesh.k8s.aws/v1beta2
+kind: VirtualNode
+metadata:
+  name: scorekeep-frontend
+  namespace: sbr-poc-appmesh
+spec:
+  podSelector:
+    matchLabels:
+      app: scorekeep-frontend
+  listeners:
+    - portMapping:
+        port: 8080
+        protocol: http
+      healthCheck:
+        protocol: http
+        path: '/ping'
+        healthyThreshold: 2
+        unhealthyThreshold: 2
+        timeoutMillis: 2000
+        intervalMillis: 5000
+  backends:
+    - virtualService:
+        virtualServiceRef:
+          name: scorekeep-api
+  serviceDiscovery:
+    dns:
+      hostname: front.sbr-poc-appmesh.svc.cluster.local
+---
+apiVersion: appmesh.k8s.aws/v1beta2
+kind: VirtualNode
+metadata:
+  name: scorekeep-api
+  namespace: sbr-poc-appmesh
+spec:
+  podSelector:
+    matchLabels:
+      app: scorekeep-api
+  listeners:
+    - portMapping:
+        port: 8080
+        protocol: http
+      healthCheck:
+        protocol: http
+        path: '/ping'
+        healthyThreshold: 2
+        unhealthyThreshold: 2
+        timeoutMillis: 2000
+        intervalMillis: 5000
+  serviceDiscovery:
+    dns:
+      hostname: scorekeep-api.sbr-poc-appmesh.svc.cluster.local
+---
+apiVersion: appmesh.k8s.aws/v1beta2
+kind: VirtualService
+metadata:
+  name: scorekeep-api
+  namespace: sbr-poc-appmesh
+spec:
+  awsName: scorekeep-api.sbr-poc-appmesh.svc.cluster.local
+  provider:
+    VirtualNode:
+      virtualNodeRef:
+        name: scorekeep-api
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: scorekeep-frontend
+  namespace: sbr-poc-appmesh
+spec:
+  ports:
+    - port: 8080
+      protocol: TCP
+  selector:
+    app: scorekeep-frontend
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: scorekeep-frontend
+  namespace: sbr-poc-appmesh
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: scorekeep-frontend
+  template:
+    metadata:
+      labels:
+        app: scorekeep-frontend
+    spec:
+      serviceAccountName: appmesh-pod
+      securityContext:
+        fsGroup: 1337
+      containers:
+        - name: scorekeep-frontend
+          image: 540678377720.dkr.ecr.ap-northeast-1.amazonaws.com/scorekeep-frontend
+          ports:
+            - name: app-port
+              containerPort: 8080
+          readinessProbe:
+            httpGet:
+              path: /ping
+              port: 8080
+            initialDelaySeconds: 1
+            periodSeconds: 5
+            failureThreshold: 1
+          livenessProbe:
+            httpGet:
+              path: /ping
+              port: 8080
+            initialDelaySeconds: 1
+            periodSeconds: 5
+            failureThreshold: 1
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: scorekeep-api
+  namespace: sbr-poc-appmesh
+spec:
+  ports:
+    - port: 8080
+      name: http
+  selector:
+    app: color
+    version: scorekeep-api
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: scorekeep-api
+  namespace: sbr-poc-appmesh
+  labels:
+    app: scorekeep-api    
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: scorekeep-api
+  template:
+    metadata:
+      labels:
+        app: scorekeep-api
+    spec:
+      serviceAccountName: appmesh-pod
+      securityContext:
+        fsGroup: 1337
+      containers:
+        - name: scorekeep-api
+          image: 540678377720.dkr.ecr.ap-northeast-1.amazonaws.com/scorekeep-api
+          ports:
+            - name: app-port
+              containerPort: 8080
+          readinessProbe:
+            httpGet:
+              path: /ping
+              port: 8080
+            initialDelaySeconds: 1
+            periodSeconds: 5
+            failureThreshold: 1
+          livenessProbe:
+            httpGet:
+              path: /ping
+              port: 8080
+            initialDelaySeconds: 1
+            periodSeconds: 5
+            failureThreshold: 1
